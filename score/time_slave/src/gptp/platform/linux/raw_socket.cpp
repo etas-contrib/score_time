@@ -60,6 +60,7 @@ RawSocketImpl::~RawSocketImpl()
     Close();
 }
 
+// req-Id: comp_req__time_slave__startup
 bool RawSocketImpl::Open(const std::string& iface)
 {
     Close();
@@ -95,6 +96,7 @@ bool RawSocketImpl::Open(const std::string& iface)
     return true;
 }
 
+// req-Id: comp_req__time_slave__startup
 bool RawSocketImpl::EnableHwTimestamping()
 {
     const int fd = fd_.load(std::memory_order_relaxed);
@@ -125,6 +127,7 @@ bool RawSocketImpl::EnableHwTimestamping()
     return true;
 }
 
+// req-Id: comp_req__time_slave__shutdown
 void RawSocketImpl::Close()
 {
     const int fd = fd_.exchange(-1, std::memory_order_acq_rel);
@@ -133,6 +136,7 @@ void RawSocketImpl::Close()
     iface_.clear();
 }
 
+// req-Id: comp_req__time_slave__sync_reception
 int RawSocketImpl::Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts, int timeout_ms)
 {
     const int fd = fd_.load(std::memory_order_acquire);
@@ -174,6 +178,7 @@ int RawSocketImpl::Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts
     return len;
 }
 
+// req-Id: comp_req__time_slave__sync_publishing
 int RawSocketImpl::Send(const void* buf, int len, ::timespec& hwts)
 {
     const int fd = fd_.load(std::memory_order_acquire);

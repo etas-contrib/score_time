@@ -29,6 +29,7 @@ PeerDelayMeasurer::PeerDelayMeasurer(const ClockIdentity& local_identity, std::u
 {
 }
 
+// req-Id: comp_req__time_slave__pdelay_req
 int PeerDelayMeasurer::SendRequest(RawSocket& socket)
 {
     PTPMessage req{};
@@ -144,6 +145,7 @@ void PeerDelayMeasurer::ComputeAndStoreUnlocked() noexcept
     // t4 = BPF_T_BINTIME (PHC) receive timestamp of Pdelay_Resp (main BPF fd)
     const TmvT t4 = resp_.recvHardwareTS;
 
+    // req-Id: comp_req__time_slave__pdelay_computation
     const std::int64_t delay = ((t2.ns - t1.ns) + (t4.ns - t3c.ns)) / 2LL;
 
     if (delay < 0)

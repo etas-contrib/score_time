@@ -53,6 +53,7 @@ struct RecordEntry
  * When enabled, appends CSV lines to the configured file path.
  * Format: mono_ns,event,offset_ns,pdelay_ns,seq_id,status_flags
  */
+// req-Id: comp_req__time_slave__diagnostics
 class Recorder final
 {
   public:

@@ -39,6 +39,7 @@ struct PhcConfig
  *
  * Platform-specific: Linux uses clock_adjtime(), QNX uses EMAC PTP ioctls.
  */
+// req-Id: comp_req__time_slave__platform_support
 class PhcAdjuster final
 {
   public:

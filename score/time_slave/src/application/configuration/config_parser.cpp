@@ -101,6 +101,7 @@ void ParsePhcConfig(const Object& obj, details::PhcConfig& cfg)
 }
 
 /// Parse the optional "qnx" nested object. If absent, @p qnx keeps defaults.
+// req-Id: comp_req__time_slave__platform_support
 void ParseQnxConfig(const Object& obj, TimeSlaveConfig::QnxSettings& qnx)
 {
     const auto obj_result = GetAttribute<Object>(std::cref(obj), "qnx");
@@ -121,6 +122,7 @@ void ParseQnxConfig(const Object& obj, TimeSlaveConfig::QnxSettings& qnx)
 
 }  // namespace
 
+// req-Id: comp_req__time_slave__configuration
 TimeSlaveConfig ParseConfig(const std::string& path)
 {
     const score::json::JsonParser parser;

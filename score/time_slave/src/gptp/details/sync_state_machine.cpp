@@ -133,6 +133,7 @@ SyncResult SyncStateMachine::BuildResult(const PTPMessage& sync, const PTPMessag
     d.clock_identity = ClockIdentityToU64(sync.ptpHdr.sourcePortIdentity.clockIdentity);
 
     // IEEE 802.1AS Clause 11.4.1
+    // req-Id: comp_req__time_slave__phc_frequency
     if (prev_slave_rx_ns_ != 0 && prev_master_origin_ns_ != 0)
     {
         const std::int64_t slave_interval = sync.recvHardwareTS.ns - prev_slave_rx_ns_;

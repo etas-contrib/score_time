@@ -36,6 +36,7 @@ namespace details
  * On Linux uses AF_PACKET / SO_TIMESTAMPING.
  * On QNX uses the QNX raw-socket shim.
  */
+// req-Id: comp_req__time_slave__platform_support
 class RawSocketImpl : public RawSocket
 {
   public:

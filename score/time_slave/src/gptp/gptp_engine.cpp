@@ -68,6 +68,7 @@ GptpEngine::~GptpEngine() noexcept
     Deinitialize();
 }
 
+// req-Id: comp_req__time_slave__startup
 bool GptpEngine::Initialize()
 {
     if (running_.load(std::memory_order_acquire))
@@ -75,6 +76,7 @@ bool GptpEngine::Initialize()
 
     if (!identity_->Resolve(opts_.iface_name))
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogError(kTimeSlaveAppContext)
             << "GptpEngine: failed to resolve ClockIdentity for " << opts_.iface_name;
         return false;
@@ -84,6 +86,7 @@ bool GptpEngine::Initialize()
 
     if (!socket_->Open(opts_.iface_name))
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogError(kTimeSlaveAppContext)
             << "GptpEngine: failed to open raw socket on " << opts_.iface_name;
         return false;
@@ -91,6 +94,7 @@ bool GptpEngine::Initialize()
 
     if (!socket_->EnableHwTimestamping())
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogWarn(kTimeSlaveAppContext)
             << "GptpEngine: HW timestamping not available on " << opts_.iface_name << ", falling back to SW timestamps";
     }
@@ -107,6 +111,7 @@ bool GptpEngine::Initialize()
     }
     catch (const std::system_error& e)
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogError(kTimeSlaveAppContext)
             << "GptpEngine: failed to create RxThread: " << std::string_view{e.what()};
         running_.store(false, std::memory_order_release);
@@ -122,6 +127,7 @@ bool GptpEngine::Initialize()
     }
     catch (const std::system_error& e)
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogError(kTimeSlaveAppContext)
             << "GptpEngine: failed to create PdelayThread: " << std::string_view{e.what()};
         Deinitialize();
@@ -132,6 +138,7 @@ bool GptpEngine::Initialize()
     return true;
 }
 
+// req-Id: comp_req__time_slave__shutdown
 bool GptpEngine::Deinitialize()
 {
     running_.store(false, std::memory_order_release);
@@ -192,6 +199,7 @@ void GptpEngine::RxLoop() noexcept
     }
 }
 
+// req-Id: comp_req__time_slave__pdelay_req
 void GptpEngine::PdelayLoop() noexcept
 {
     ::timespec next{};
@@ -257,12 +265,16 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
 
     switch (msg.msgtype)
     {
+        // req-Id: comp_req__time_slave__pdelay_req_response
         case kPtpMsgtypePdelayReq:
+            // req-Id: comp_req__time_slave__domain_filtering
             if (msg.ptpHdr.domainNumber == opts_.domain_number)
                 SendPDelayResponseAndFollowUp(msg, hw_ts);
             break;
 
+        // req-Id: comp_req__time_slave__sync_reception
         case kPtpMsgtypeSync:
+            // req-Id: comp_req__time_slave__domain_filtering
             if (msg.ptpHdr.domainNumber != opts_.domain_number)
                 break;
             msg.recvHardwareTS = hw_ts;
@@ -270,7 +282,9 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
             sync_sm_.OnSync(msg);
             break;
 
+        // req-Id: comp_req__time_slave__followup_processing
         case kPtpMsgtypeFollowUp:
+            // req-Id: comp_req__time_slave__domain_filtering
             if (msg.ptpHdr.domainNumber != opts_.domain_number)
                 break;
             msg.parseMessageTs = TimestampToTmv(msg.follow_up.preciseOriginTimestamp);
@@ -294,6 +308,7 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
             }
             break;
 
+        // req-Id: comp_req__time_slave__pdelay_resp_reception
         case kPtpMsgtypePdelayResp:
             msg.recvHardwareTS = hw_ts;
             msg.parseMessageTs = TimestampToTmv(msg.pdelay_resp.requestReceiptTimestamp);
@@ -301,6 +316,7 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
                 pdelay_->OnResponse(msg);
             break;
 
+        // req-Id: comp_req__time_slave__pdelay_resp_fu_rx
         case kPtpMsgtypePdelayRespFollowUp:
             msg.parseMessageTs = TimestampToTmv(msg.pdelay_resp_fup.responseOriginReceiptTimestamp);
             if (pdelay_)
@@ -339,7 +355,9 @@ void GptpEngine::UpdateSnapshot(const SyncResult& sync, const PDelayResult& pdel
         const bool is_step = (sync.offset_ns >= opts_.phc_config.step_threshold_ns) ||
                              (sync.offset_ns <= -opts_.phc_config.step_threshold_ns);
 
+        // req-Id: comp_req__time_slave__phc_offset
         phc_.AdjustOffset(sync.offset_ns);
+        // req-Id: comp_req__time_slave__phc_frequency
         phc_.AdjustFrequency(rate_ratio);
 
         if (is_step)
