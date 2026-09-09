@@ -37,10 +37,12 @@ constexpr std::int32_t kInitFailure = -1;
 
 TimeSlave::TimeSlave() = default;
 
+// req-Id: comp_req__time_slave__startup
 std::int32_t TimeSlave::Initialize(const score::mw::lifecycle::ApplicationContext& context)
 {
     namespace fs = std::filesystem;
 
+    // req-Id: comp_req__time_slave__configuration
     // Resolve config path: --config CLI > TIMESLAVE_CONFIG env > ./etc/time_slave_config.json
     fs::path config_path;
     const std::string cli_config = context.get_argument("--config");
@@ -83,6 +85,7 @@ std::int32_t TimeSlave::Initialize(const score::mw::lifecycle::ApplicationContex
     // Apply QNX-specific settings via environment variables (read by the QNX
     // raw-socket shim). Pre-existing env vars are never overridden so users can
     // still override at the command line.
+    // req-Id: comp_req__time_slave__platform_support
     if (!cfg.qnx.bpf_device_prefix.empty() && std::getenv("SOCK") == nullptr)
     {
         ::setenv("SOCK", cfg.qnx.bpf_device_prefix.c_str(), 0);
@@ -96,12 +99,14 @@ std::int32_t TimeSlave::Initialize(const score::mw::lifecycle::ApplicationContex
 
     if (!engine_->Initialize())
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogError(kTimeSlaveAppContext) << "TimeSlave: GptpEngine initialization failed";
         return kInitFailure;
     }
 
     if (!publisher_.Open())
     {
+        // req-Id: comp_req__time_slave__error_reporting
         score::mw::log::LogError(kTimeSlaveAppContext) << "TimeSlave: shared memory publisher initialization failed";
         return kInitFailure;
     }
@@ -112,6 +117,7 @@ std::int32_t TimeSlave::Initialize(const score::mw::lifecycle::ApplicationContex
 
 std::int32_t TimeSlave::Run(const score::cpp::stop_token& token)
 {
+    // req-Id: comp_req__time_slave__sync_publishing
     constexpr auto kPublishInterval = std::chrono::milliseconds{50};
 
     score::mw::log::LogInfo(kTimeSlaveAppContext) << "TimeSlave running";
@@ -128,6 +134,7 @@ std::int32_t TimeSlave::Run(const score::cpp::stop_token& token)
         std::this_thread::sleep_for(kPublishInterval);
     }
 
+    // req-Id: comp_req__time_slave__shutdown
     engine_->Deinitialize();
     publisher_.Close();
 

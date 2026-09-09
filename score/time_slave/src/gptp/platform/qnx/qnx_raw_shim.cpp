@@ -26,6 +26,8 @@
 #include <cstdlib>
 #include <cstring>
 
+// req-Id: comp_req__time_slave__platform_support
+
 #define PTP_GET_TIME 0x102
 #define PTP_SET_TIME 0x103
 // EMAC_PTP_ADJ_FREQ_PPM: Qualcomm BSP (hw/iosock/emac_ioctl.h), ptp_ppm_t = int

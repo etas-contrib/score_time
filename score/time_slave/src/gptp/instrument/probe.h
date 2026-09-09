@@ -51,6 +51,7 @@ struct ProbeData
  * When enabled, traces probe events to the logger and optionally to a Recorder.
  * Controlled at runtime via SetEnabled().
  */
+// req-Id: comp_req__time_slave__diagnostics
 class ProbeManager final
 {
   public:

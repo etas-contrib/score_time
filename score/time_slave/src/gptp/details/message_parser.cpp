@@ -107,11 +107,13 @@ bool GptpMessageParser::Parse(const std::uint8_t* payload, std::size_t payload_l
 
     switch (msg.msgtype)
     {
+        // req-Id: comp_req__time_slave__followup_processing
         case kPtpMsgtypeFollowUp:
             if (payload_len >= kBodyOffset + sizeof(Timestamp))
                 msg.follow_up.preciseOriginTimestamp = LoadTimestamp(payload + kBodyOffset);
             break;
 
+        // req-Id: comp_req__time_slave__pdelay_resp_reception
         case kPtpMsgtypePdelayResp:
             if (payload_len >= kBodyOffset + sizeof(Timestamp))
             {
@@ -127,6 +129,7 @@ bool GptpMessageParser::Parse(const std::uint8_t* payload, std::size_t payload_l
             }
             break;
 
+        // req-Id: comp_req__time_slave__pdelay_resp_fu_rx
         case kPtpMsgtypePdelayRespFollowUp:
             if (payload_len >= kBodyOffset + sizeof(Timestamp))
             {

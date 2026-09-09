@@ -32,6 +32,7 @@ namespace details
  * 0xFF 0xFE at positions 3–4 to form an EUI-64 (per IEEE 1588-2019 §7.5.2.2).
  * Platform implementation: Linux + QNX via #ifdef.
  */
+ // req-Id: comp_req__time_slave__platform_support
 class NetworkIdentityImpl : public NetworkIdentity
 {
   public:

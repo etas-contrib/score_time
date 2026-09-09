@@ -31,6 +31,7 @@ namespace ts
  * provided). Holds both the GptpEngine/PHC options and any process-level
  * configuration.
  */
+// req-Id: comp_req__time_slave__configuration
 struct TimeSlaveConfig
 {
     /// gPTP engine options (passed directly to GptpEngine).
@@ -40,6 +41,7 @@ struct TimeSlaveConfig
     std::string shm_path = "/gptp_shmem";
 
     /// QNX-specific settings. Only relevant on QNX builds.
+    // req-Id: comp_req__time_slave__platform_support
     struct QnxSettings
     {
         std::string bpf_device_prefix = "/dev/bpf";  ///< BPF device path prefix.
