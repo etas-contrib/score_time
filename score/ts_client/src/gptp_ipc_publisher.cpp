@@ -30,6 +30,7 @@ GptpIpcPublisher::~GptpIpcPublisher()
     Close();
 }
 
+// req-Id: comp_req__ts_client__shared_memory_mgmt
 bool GptpIpcPublisher::Open(const std::string& ipc_name)
 {
     if (shm_resource_ != nullptr)
@@ -40,6 +41,8 @@ bool GptpIpcPublisher::Open(const std::string& ipc_name)
     score::memory::shared::SharedMemoryFactory::Remove(ipc_name_);
     score::memory::shared::SharedMemoryFactory::RemoveStaleArtefacts(ipc_name_);
 
+    // req-Id: comp_req__ts_client__publisher_creates
+    // req-Id: comp_req__ts_client__platform_support
     shm_resource_ = score::memory::shared::SharedMemoryFactory::Create(
         ipc_name_,
         [this](std::shared_ptr<score::memory::shared::ISharedMemoryResource> res) {
@@ -56,6 +59,7 @@ void GptpIpcPublisher::Publish(const score::ts::GptpIpcData& data)
     if (region_ == nullptr)
         return;
 
+    // req-Id: comp_req__ts_client__seqlock_protocol
     const std::uint32_t next = region_->seq.load(std::memory_order_relaxed) + 1U;
     region_->seq.store(next, std::memory_order_relaxed);
     // Release fence: prevents the data writes below from being reordered before
@@ -63,12 +67,17 @@ void GptpIpcPublisher::Publish(const score::ts::GptpIpcData& data)
     // half of acq_rel is unnecessary for a seqlock writer; release suffices here.
     std::atomic_thread_fence(std::memory_order_release);
 
+    // req-Id: comp_req__ts_client__sync_status_data
+    // req-Id: comp_req__ts_client__sync_fup_data
+    // req-Id: comp_req__ts_client__pdelay_data
+    // req-Id: comp_req__ts_client__time_correlation_data
     std::memcpy(&region_->data, &data, sizeof(score::ts::GptpIpcData));
 
     region_->seq_confirm.store(next + 1U, std::memory_order_release);
     region_->seq.store(next + 1U, std::memory_order_release);
 }
 
+// req-Id: comp_req__ts_client__shared_memory_mgmt
 void GptpIpcPublisher::Close()
 {
     if (!ipc_name_.empty())

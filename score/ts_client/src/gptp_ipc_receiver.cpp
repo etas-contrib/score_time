@@ -29,11 +29,14 @@ GptpIpcReceiver::~GptpIpcReceiver()
     Close();
 }
 
+// req-Id: comp_req__ts_client__shared_memory_mgmt
+// req-Id: comp_req__ts_client__receiver_multi_reader
 bool GptpIpcReceiver::Open(const std::string& ipc_name)
 {
     if (shm_resource_ != nullptr)
         return true;
 
+    // req-Id: comp_req__ts_client__platform_support
     shm_resource_ = score::memory::shared::SharedMemoryFactory::Open(ipc_name, false);
     if (shm_resource_ == nullptr)
         return false;
@@ -51,6 +54,7 @@ bool GptpIpcReceiver::Open(const std::string& ipc_name)
     }
     region_ = static_cast<const GptpIpcRegion*>(ptr);
 
+    // req-Id: comp_req__ts_client__shm_validation
     if (region_->magic.load(std::memory_order_acquire) != kGptpIpcMagic)
     {
         Close();
@@ -62,9 +66,11 @@ bool GptpIpcReceiver::Open(const std::string& ipc_name)
 
 std::optional<score::ts::GptpIpcData> GptpIpcReceiver::Receive()
 {
+    // req-Id: comp_req__ts_client__data_validity
     if (region_ == nullptr)
         return std::nullopt;
 
+    // req-Id: comp_req__ts_client__seqlock_protocol
     for (int attempt = 0; attempt < kMaxRetries; ++attempt)
     {
         const std::uint32_t seq1 = region_->seq.load(std::memory_order_acquire);
@@ -72,6 +78,10 @@ std::optional<score::ts::GptpIpcData> GptpIpcReceiver::Receive()
         if ((seq1 & 1U) != 0U)
             continue;  // write in progress, retry
 
+        // req-Id: comp_req__ts_client__sync_status_data
+        // req-Id: comp_req__ts_client__sync_fup_data
+        // req-Id: comp_req__ts_client__pdelay_data
+        // req-Id: comp_req__ts_client__time_correlation_data
         score::ts::GptpIpcData data{};
         std::memcpy(&data, &region_->data, sizeof(score::ts::GptpIpcData));
 
@@ -87,6 +97,7 @@ std::optional<score::ts::GptpIpcData> GptpIpcReceiver::Receive()
         // partially-written data (seqlock race on all multi-core platforms).
         const std::uint32_t seq3 = region_->seq.load(std::memory_order_acquire);
 
+        // req-Id: comp_req__ts_client__data_validity
         if (seq1 == seq2 && seq1 == seq3)
             return data;
     }
@@ -94,6 +105,7 @@ std::optional<score::ts::GptpIpcData> GptpIpcReceiver::Receive()
     return std::nullopt;
 }
 
+// req-Id: comp_req__ts_client__shared_memory_mgmt
 void GptpIpcReceiver::Close()
 {
     shm_resource_.reset();
