@@ -116,6 +116,7 @@ bool operator!=(const TimeBaseSnapshot& first, const TimeBaseSnapshot& second) n
     return !(first == second);
 }
 
+// req-Id: comp_req__time_daemon__published_data_content
 void TimeBaseSnapshot::CreateFrom(const PtpTimeInfo& info)
 {
     SCORE_LANGUAGE_FUTURECPP_ASSERT_PRD_MESSAGE(info.ptp_assumed_time.count() >= 0,

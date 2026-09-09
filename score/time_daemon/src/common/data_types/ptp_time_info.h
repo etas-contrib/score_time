@@ -33,6 +33,7 @@ namespace td
  * - is_time_jump_past: true if a past time jump was detected in current frame, false otherwise
  * - is_correct: true if the PTP status is correct, false otherwise
  */
+// req-Id: comp_req__time_daemon__published_data_content
 struct PtpStatus
 {
     bool is_synchronized;
@@ -43,6 +44,7 @@ struct PtpStatus
 };
 
 /// \brief POD struct to hold PTP sync data content
+// req-Id: comp_req__time_daemon__published_data_content
 struct SyncFupData
 {
     std::uint64_t precise_origin_timestamp;
@@ -57,6 +59,7 @@ struct SyncFupData
 };
 
 /// \brief POD struct to hold PTP Pdelay measurement result content
+// req-Id: comp_req__time_daemon__published_data_content
 struct PDelayData
 {
     std::uint64_t request_origin_timestamp;
@@ -74,6 +77,7 @@ struct PDelayData
 };
 
 /// \brief General type class to store and pass all necessary data
+// req-Id: comp_req__time_daemon__published_data_content
 struct PtpTimeInfo
 {
     /**

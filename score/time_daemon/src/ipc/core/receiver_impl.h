@@ -48,12 +48,14 @@ class ReceiverImpl : public Receiver<IpcDataType>
     SharedMemoryHandler<IpcDataType> shm_handler_;
 };
 
+// req-Id: comp_req__time_daemon__initialization
 template <typename IpcDataType>
 bool ReceiverImpl<IpcDataType>::Init() noexcept
 {
     return shm_handler_.Init();
 }
 
+// req-Id: comp_req__time_daemon__gptp_shm_reception
 template <typename IpcDataType>
 std::optional<IpcDataType> ReceiverImpl<IpcDataType>::Receive() noexcept
 {
