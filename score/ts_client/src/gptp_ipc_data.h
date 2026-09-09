@@ -24,6 +24,7 @@ namespace ts
 /**
  * @brief IPC-layer status flags transmitted from TimeSlave to TimeDaemon.
  */
+// req-Id: comp_req__ts_client__sync_status_data
 struct GptpIpcStatus
 {
     bool is_synchronized;
@@ -33,6 +34,7 @@ struct GptpIpcStatus
     bool is_correct;
 };
 
+// req-Id: comp_req__ts_client__sync_fup_data
 struct GptpIpcSyncFupData
 {
     std::uint64_t precise_origin_timestamp;
@@ -46,6 +48,7 @@ struct GptpIpcSyncFupData
     std::uint64_t clock_identity;
 };
 
+// req-Id: comp_req__ts_client__pdelay_data
 struct GptpIpcPDelayData
 {
     std::uint64_t request_origin_timestamp;
@@ -68,6 +71,10 @@ struct GptpIpcPDelayData
  * This type is internal to ts_client and intentionally decoupled from
  * score::td::PtpTimeInfo.  Callers are responsible for mapping between the two.
  */
+// req-Id: comp_req__ts_client__sync_status_data
+// req-Id: comp_req__ts_client__sync_fup_data
+// req-Id: comp_req__ts_client__pdelay_data
+// req-Id: comp_req__ts_client__time_correlation_data
 struct GptpIpcData
 {
     std::chrono::nanoseconds ptp_assumed_time;
