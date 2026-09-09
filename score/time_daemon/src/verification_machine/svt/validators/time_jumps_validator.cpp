@@ -53,6 +53,7 @@ void TimeJumpsValidator::DoValidation(PtpTimeInfo& data)
     }
 }
 
+// req-Id: comp_req__time_daemon__time_jump_detection
 bool TimeJumpsValidator::IsTimeJumpDetected(const PtpTimeInfo& data)
 {
     bool is_time_jump_detected{false};
@@ -75,6 +76,7 @@ bool TimeJumpsValidator::IsTimeJumpDetected(const PtpTimeInfo& data)
             {
                 is_time_jump_detected = true;
                 time_jump_state_ = TimeJumpState::kJumpToPast;
+                // req-Id: comp_req__time_daemon__error_reporting
                 score::mw::log::LogWarn(kVerificationMachineContext)
                     << "TimeJumpsValidator: Time jump to past detected! Jump = " << current_jump_to_past << " ns";
             }
@@ -88,6 +90,7 @@ bool TimeJumpsValidator::IsTimeJumpDetected(const PtpTimeInfo& data)
             {
                 is_time_jump_detected = true;
                 time_jump_state_ = TimeJumpState::kJumpToFuture;
+                // req-Id: comp_req__time_daemon__error_reporting
                 score::mw::log::LogWarn(kVerificationMachineContext)
                     << "TimeJumpsValidator: Time jump to future detected! Jump = " << current_jump_to_future << " ns";
             }
@@ -99,6 +102,7 @@ bool TimeJumpsValidator::IsTimeJumpDetected(const PtpTimeInfo& data)
     }
     else
     {
+        // req-Id: comp_req__time_daemon__error_reporting
         score::mw::log::LogError(kVerificationMachineContext)
             << "TimeJumpsValidator: Current Sync T2 is less than previous: [Current Sync: " << data.sync_fup_data
             << "], [Prv Sync: " << last_sync_frame_.value().sync_fup_data << "]";
@@ -120,6 +124,7 @@ void TimeJumpsValidator::HandleIdleState(const PtpTimeInfo& data)
     }
 }
 
+// req-Id: comp_req__time_daemon__sync_debounce
 void TimeJumpsValidator::HandleInitialSyncDebouncingState()
 {
     if ((sync_debouncing_init_time_ + sync_debounce_threshold_) < debouncing_clock_.Now().TimeSinceEpoch())
@@ -135,6 +140,7 @@ void TimeJumpsValidator::SyncFramesHandler(PtpTimeInfo& data)
         if (not(IsTimeJumpDetected(data)))
         {
             valid_frames_cnt_++;
+            // req-Id: comp_req__time_daemon__time_jump_recovery
             if (valid_frames_cnt_ >= valid_frames_threshold_)
             {
                 // Clear timejump
@@ -152,6 +158,7 @@ void TimeJumpsValidator::SyncFramesHandler(PtpTimeInfo& data)
     UpdateStatus(data);
 }
 
+// req-Id: comp_req__time_daemon__time_jump_reaction
 void TimeJumpsValidator::UpdateStatus(PtpTimeInfo& data)
 {
     // Update Time jump flags
@@ -174,6 +181,7 @@ void TimeJumpsValidator::UpdateStatus(PtpTimeInfo& data)
     }
 }
 
+// req-Id: comp_req__time_daemon__sync_debounce
 void TimeJumpsValidator::GoToInitialSyncDebouncing()
 {
     // Set debouncing timer, so we will calculate sync debouncing time from this point

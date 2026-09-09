@@ -27,6 +27,7 @@ TimeDaemon::TimeDaemon() : score::mw::lifecycle::Application()
     svt_timebase_handler_ = CreateSvtTimebase();
 }
 
+// req-Id: comp_req__time_daemon__initialization
 std::int32_t TimeDaemon::Initialize(const score::mw::lifecycle::ApplicationContext&)
 {
     score::mw::log::LogInfo(kAppContext) << "TimeDaemon initializing...";
@@ -43,10 +44,12 @@ std::int32_t TimeDaemon::Run(const score::cpp::stop_token& token)
 
     while (!token.stop_requested())
     {
+        // req-Id: comp_req__time_daemon__publish_interval
         svt_timebase_handler_->RunOnce(token);
         score::concurrency::wait_for(token, std::chrono::milliseconds(100));
     }
 
+    // req-Id: comp_req__time_daemon__shutdown
     svt_timebase_handler_->Stop();
 
     score::mw::log::LogInfo(kAppContext) << "Run() finished";

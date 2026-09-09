@@ -182,6 +182,7 @@ void ControlFlowDivider<DataType, BufferSize>::OnEvent() noexcept
     }
 }
 
+// req-Id: comp_req__time_daemon__timeout_reaction
 template <typename DataType, size_t BufferSize>
 void ControlFlowDivider<DataType, BufferSize>::OnTimeout() noexcept
 {
@@ -190,6 +191,7 @@ void ControlFlowDivider<DataType, BufferSize>::OnTimeout() noexcept
     this->Publish(last_data_);
 }
 
+// req-Id: comp_req__time_daemon__time_data_publishing
 template <typename DataType, size_t BufferSize>
 void ControlFlowDivider<DataType, BufferSize>::Publish(const DataType& data)
 {

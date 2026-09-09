@@ -40,6 +40,7 @@ void TimeoutValidator::DoValidation(PtpTimeInfo& data)
     }
     else
     {
+        // req-Id: comp_req__time_daemon__timeout_detection
         // In case no new frame -> check if timeout occurs
         const auto now = timeout_clock_.Now().TimeSinceEpoch();
         const auto now_nano = std::chrono::duration_cast<std::chrono::nanoseconds>(now);
@@ -52,8 +53,10 @@ void TimeoutValidator::DoValidation(PtpTimeInfo& data)
             const auto elapsed = now_nano - reception_time_nano;
             if (elapsed > threshold_)
             {
+                // req-Id: comp_req__time_daemon__timeout_reaction
                 // Timeout occurred -> set timeout flag
                 data.status.is_timeout = true;
+                // req-Id: comp_req__time_daemon__error_reporting
                 score::mw::log::LogWarn(kVerificationMachineContext)
                     << "TimeoutValidator: Timeout detected! [" << elapsed.count() << ", " << threshold_.count()
                     << "] ns";
@@ -61,6 +64,7 @@ void TimeoutValidator::DoValidation(PtpTimeInfo& data)
         }
         else
         {
+            // req-Id: comp_req__time_daemon__error_reporting
             score::mw::log::LogError(kVerificationMachineContext)
                 << "TimeoutValidator: Current time is less than reception time! [Now:" << now_nano.count()
                 << "ns, Reception time:" << reception_time_nano.count() << "ns]";

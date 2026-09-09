@@ -142,6 +142,7 @@ bool PTPMachine<PTPEngine>::Init()
         }
         else
         {
+            // req-Id: comp_req__time_daemon__error_reporting
             score::mw::log::LogError(kPtpMachineContext) << "QPTP stack initialization failed";
         }
     }
@@ -177,6 +178,7 @@ void PTPMachine<PTPEngine>::PeriodicTask() noexcept
     }
     else
     {
+        // req-Id: comp_req__time_daemon__error_reporting
         score::mw::log::LogWarn(kPtpMachineContext) << "Failed to retrieve time data from PTP stack";
     }
 }

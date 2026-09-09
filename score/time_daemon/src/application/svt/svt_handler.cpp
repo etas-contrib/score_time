@@ -42,8 +42,10 @@ SvtHandler::SvtHandler() noexcept
     gptp_machine_ = CreateGPTPShmMachine("ptp_worker");
     verification_machine_ = CreateSvtVerificationMachine("time_verification_worker");
     ipc_publisher_ = CreateSvtPublisher("svt_ipc_publisher");
+    // req-Id: comp_req__time_daemon__publish_interval
     ctrl_flow_divider_ = CreatePtpControlFlowDivider("ptp_control_flow_divider", std::chrono::milliseconds{250});
 
+    // req-Id: comp_req__time_daemon__initialization
     std::vector<Job> jobs = {
         {[this] {
              return gptp_machine_->Init();
@@ -71,6 +73,7 @@ SvtHandler::SvtHandler() noexcept
     score::mw::log::LogInfo(kTimeBaseHandlerSvt) << "Handler created!";
 }
 
+// req-Id: comp_req__time_daemon__initialization
 void SvtHandler::Initialize() noexcept
 {
     const auto input_ptp_data_topic = Topic("in_ptp_data");
@@ -118,6 +121,7 @@ void SvtHandler::RunOnce(const score::cpp::stop_token& token) noexcept
                 case JobRunner::Result::kFailed:
                 {
                     handler_status_ = TimebaseHandler::Status::kFailed;
+                    // req-Id: comp_req__time_daemon__error_reporting
                     score::mw::log::LogError(kTimeBaseHandlerSvt) << "Initialization failed, handler not ready!!";
                     break;
                 }
@@ -139,6 +143,7 @@ void SvtHandler::Stop() noexcept
 {
     if (handler_status_ == TimebaseHandler::Status::kWorking)
     {
+        // req-Id: comp_req__time_daemon__shutdown
         gptp_machine_->Stop();
         ctrl_flow_divider_->Stop();
         score::mw::log::LogInfo(kTimeBaseHandlerSvt) << "Stopping proactive machines!";

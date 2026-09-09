@@ -50,6 +50,7 @@ class PublisherImpl : public ReactiveMachine, public Consumer<DataType>
     SharedMemoryHandler<IpcDataType> shm_handler_;
 };
 
+// req-Id: comp_req__time_daemon__initialization
 template <typename DataType, typename IpcDataType>
 bool PublisherImpl<DataType, IpcDataType>::Init()
 {
@@ -59,6 +60,9 @@ bool PublisherImpl<DataType, IpcDataType>::Init()
 template <typename DataType, typename IpcDataType>
 void PublisherImpl<DataType, IpcDataType>::OnMessage(DataType data)
 {
+    // req-Id: comp_req__time_daemon__time_data_publishing
+    // req-Id: comp_req__time_daemon__published_data_content
+    // req-Id: comp_req__time_daemon__time_point_qualifier
     const IpcDataType ipc_data = ConvertToIpcData<IpcDataType>(data);
     shm_handler_.Send(ipc_data);
 }

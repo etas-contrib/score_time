@@ -25,6 +25,7 @@ namespace details
 
 ShmPTPEngine::ShmPTPEngine(std::string ipc_name) noexcept : ipc_name_{std::move(ipc_name)} {}
 
+// req-Id: comp_req__time_daemon__initialization
 bool ShmPTPEngine::Initialize()
 {
     if (initialized_)
@@ -37,6 +38,7 @@ bool ShmPTPEngine::Initialize()
     }
     else
     {
+        // req-Id: comp_req__time_daemon__error_reporting
         score::mw::log::LogError(kGPtpMachineContext) << "ShmPTPEngine: failed to open IPC channel " << ipc_name_;
     }
     return initialized_;
@@ -46,12 +48,14 @@ bool ShmPTPEngine::Deinitialize()
 {
     if (initialized_)
     {
+        // req-Id: comp_req__time_daemon__shutdown
         receiver_.Close();
         initialized_ = false;
     }
     return true;
 }
 
+// req-Id: comp_req__time_daemon__gptp_shm_reception
 bool ShmPTPEngine::ReadPTPSnapshot(PtpTimeInfo& info)
 {
     if (!initialized_)

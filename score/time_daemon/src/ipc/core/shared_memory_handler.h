@@ -98,12 +98,14 @@ class SharedMemoryHandler
     const std::size_t max_number_of_read_retries_;
 };
 
+// req-Id: comp_req__time_daemon__initialization
 template <typename DataType>
 bool SharedMemoryHandler<DataType>::Init()
 {
     if (shared_memory_resource_ == nullptr)
     {
         score::memory::shared::SharedMemoryFactory::WorldWritable permissions{};
+        // req-Id: comp_req__time_daemon__platform_support
         shared_memory_resource_ = score::memory::shared::SharedMemoryFactory::CreateOrOpen(
             shared_memory_path_,
             [this](std::shared_ptr<score::memory::shared::ISharedMemoryResource> memory_resource) {
@@ -114,6 +116,7 @@ bool SharedMemoryHandler<DataType>::Init()
 
         if (shared_memory_resource_ == nullptr)
         {
+            // req-Id: comp_req__time_daemon__error_reporting
             score::mw::log::LogFatal(kIpcHandlerContext)
                 << "shared memory segment could not be created for path " << shared_memory_path_;
         }
@@ -140,6 +143,8 @@ std::optional<DataType> SharedMemoryHandler<DataType>::Receive() const
     {
         DataType read_data{};
 
+        // req-Id: comp_req__time_daemon__multi_client
+        // req-Id: comp_req__time_daemon__non_blocking
         for (std::uint8_t retry_cnt = 0U; retry_cnt < max_number_of_read_retries_; ++retry_cnt)
         {
             // Snapshot entry counter
@@ -158,6 +163,7 @@ std::optional<DataType> SharedMemoryHandler<DataType>::Receive() const
             }
         }
 
+        // req-Id: comp_req__time_daemon__error_reporting
         score::mw::log::LogError(kIpcHandlerContext)
             << "Read failed for number of retries: " << max_number_of_read_retries_;
     }
@@ -170,6 +176,8 @@ void SharedMemoryHandler<DataType>::Send(const DataType& data)
 {
     if (shared_memory_data_ != nullptr)
     {
+        // req-Id: comp_req__time_daemon__non_blocking
+        // req-Id: comp_req__time_daemon__platform_support
         // Signal start of write (sequentially consistent by default)
         std::ignore = shared_memory_data_->entry_cnt_.fetch_add(1U);
 
