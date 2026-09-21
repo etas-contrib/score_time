@@ -40,6 +40,9 @@ docs(
         "@score_process_description//:needs_json_file",
         "@score_platform//:needs_json_file",
     ],
+    code_targets = [
+        "//score/time_daemon:time_daemon",
+    ],
     project = "S-CORE Time",
     project_url = "https://eclipse-score.github.io/time",
     source_dir = "docs",

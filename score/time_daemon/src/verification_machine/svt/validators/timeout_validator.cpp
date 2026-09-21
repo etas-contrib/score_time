@@ -26,6 +26,9 @@ TimeoutValidator::TimeoutValidator(PtpTimeInfo::ReferenceClock timeout_clock,
     reception_time_ = timeout_clock_.Now().TimeSinceEpoch();
 }
 
+// req-Id: comp_req__time_daemon__timeout_detection
+// req-Id: comp_req__time_daemon__error_reporting
+// req-Id: comp_req__time_daemon__time_point_qualifier
 void TimeoutValidator::DoValidation(PtpTimeInfo& data)
 {
     if (IsNewFrameReceived(data))
@@ -53,6 +56,7 @@ void TimeoutValidator::DoValidation(PtpTimeInfo& data)
             if (elapsed > threshold_)
             {
                 // Timeout occurred -> set timeout flag
+                // req-Id: comp_req__time_daemon__timeout_reaction
                 data.status.is_timeout = true;
                 score::mw::log::LogWarn(kVerificationMachineContext)
                     << "TimeoutValidator: Timeout detected! [" << elapsed.count() << ", " << threshold_.count()

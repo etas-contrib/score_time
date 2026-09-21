@@ -27,6 +27,7 @@ TimeDaemon::TimeDaemon() : score::mw::lifecycle::Application()
     svt_timebase_handler_ = CreateSvtTimebase();
 }
 
+// req-Id: comp_req__time_daemon__startup
 std::int32_t TimeDaemon::Initialize(const score::mw::lifecycle::ApplicationContext&)
 {
     score::mw::log::LogInfo(kAppContext) << "TimeDaemon initializing...";

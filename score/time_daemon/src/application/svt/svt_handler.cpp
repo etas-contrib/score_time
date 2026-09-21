@@ -29,6 +29,7 @@ namespace score
 namespace td
 {
 
+// req-Id: comp_req__time_daemon__startup
 SvtHandler::SvtHandler() noexcept
     : job_runner_{nullptr},
       msg_broker_{nullptr},
@@ -42,6 +43,7 @@ SvtHandler::SvtHandler() noexcept
     gptp_machine_ = CreateGPTPShmMachine("ptp_worker");
     verification_machine_ = CreateSvtVerificationMachine("time_verification_worker");
     ipc_publisher_ = CreateSvtPublisher("svt_ipc_publisher");
+    // req-Id: comp_req__time_daemon__publish_interval
     ctrl_flow_divider_ = CreatePtpControlFlowDivider("ptp_control_flow_divider", std::chrono::milliseconds{250});
 
     std::vector<Job> jobs = {
@@ -88,6 +90,7 @@ void SvtHandler::Initialize() noexcept
     score::mw::log::LogInfo(kTimeBaseHandlerSvt) << "Msg broker initialized!";
 }
 
+// req-Id: comp_req__time_daemon__error_reporting
 void SvtHandler::RunOnce(const score::cpp::stop_token& token) noexcept
 {
     switch (handler_status_)
@@ -135,6 +138,7 @@ void SvtHandler::RunOnce(const score::cpp::stop_token& token) noexcept
     }
 }
 
+// req-Id: comp_req__time_daemon__shutdown
 void SvtHandler::Stop() noexcept
 {
     if (handler_status_ == TimebaseHandler::Status::kWorking)

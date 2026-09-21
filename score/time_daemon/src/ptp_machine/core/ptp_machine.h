@@ -129,6 +129,7 @@ void PTPMachine<PTPEngine>::SetPublishCallback(std::function<void(const PtpTimeI
     publish_callback_ = std::move(callback);
 }
 
+// req-Id: comp_req__time_daemon__error_reporting
 template <class PTPEngine>
 bool PTPMachine<PTPEngine>::Init()
 {
@@ -159,6 +160,7 @@ void PTPMachine<PTPEngine>::Deinit()
     }
 }
 
+// req-Id: comp_req__time_daemon__error_reporting
 template <class PTPEngine>
 void PTPMachine<PTPEngine>::PeriodicTask() noexcept
 {

@@ -53,6 +53,8 @@ void TimeJumpsValidator::DoValidation(PtpTimeInfo& data)
     }
 }
 
+// req-Id: comp_req__time_daemon__time_jump_detection
+// req-Id: comp_req__time_daemon__error_reporting
 bool TimeJumpsValidator::IsTimeJumpDetected(const PtpTimeInfo& data)
 {
     bool is_time_jump_detected{false};
@@ -120,6 +122,7 @@ void TimeJumpsValidator::HandleIdleState(const PtpTimeInfo& data)
     }
 }
 
+// req-Id: comp_req__time_daemon__sync_debounce
 void TimeJumpsValidator::HandleInitialSyncDebouncingState()
 {
     if ((sync_debouncing_init_time_ + sync_debounce_threshold_) < debouncing_clock_.Now().TimeSinceEpoch())
@@ -128,6 +131,7 @@ void TimeJumpsValidator::HandleInitialSyncDebouncingState()
     }
 }
 
+// req-Id: comp_req__time_daemon__time_jump_recovery
 void TimeJumpsValidator::SyncFramesHandler(PtpTimeInfo& data)
 {
     if (last_sync_frame_.has_value())
@@ -152,6 +156,8 @@ void TimeJumpsValidator::SyncFramesHandler(PtpTimeInfo& data)
     UpdateStatus(data);
 }
 
+// req-Id: comp_req__time_daemon__time_jump_reaction
+// req-Id: comp_req__time_daemon__time_point_qualifier
 void TimeJumpsValidator::UpdateStatus(PtpTimeInfo& data)
 {
     // Update Time jump flags
