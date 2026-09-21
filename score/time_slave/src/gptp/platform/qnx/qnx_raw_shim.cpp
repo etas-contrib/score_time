@@ -301,6 +301,7 @@ extern "C" int qnx_raw_open(const char* ifname)
 
     g_qnx_ctx.tx_lb_fd = open_tx_loopback_fd(ifname);
 
+    // req-Id: comp_req__time_slave__ethernet_address
     static const unsigned char kPtpP2PMac[6] = {0x01U, 0x80U, 0xC2U, 0x00U, 0x00U, 0x0EU};
     static const unsigned char kPtp1588Mac[6] = {0x01U, 0x1BU, 0x19U, 0x00U, 0x00U, 0x00U};
     join_eth_multicast(ifname, kPtpP2PMac);

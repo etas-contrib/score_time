@@ -108,6 +108,7 @@ void PeerDelayMeasurer::OnResponseFollowUp(const PTPMessage& msg)
     ComputeAndStoreUnlocked();
 }
 
+// req-Id: comp_req__time_slave__pdelay_computation
 void PeerDelayMeasurer::ComputeAndStoreUnlocked() noexcept
 {
     if (resp_count_ > 1U)  // multiple responses → non-time-aware bridge detected

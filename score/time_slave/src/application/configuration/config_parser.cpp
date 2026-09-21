@@ -100,6 +100,7 @@ void ParsePhcConfig(const Object& obj, details::PhcConfig& cfg)
     ParseOptionalInt(phc_obj, "step_threshold_ns", cfg.step_threshold_ns);
 }
 
+// req-Id: comp_req__time_slave__platform_support
 /// Parse the optional "qnx" nested object. If absent, @p qnx keeps defaults.
 void ParseQnxConfig(const Object& obj, TimeSlaveConfig::QnxSettings& qnx)
 {
@@ -121,6 +122,7 @@ void ParseQnxConfig(const Object& obj, TimeSlaveConfig::QnxSettings& qnx)
 
 }  // namespace
 
+// req-Id: comp_req__time_slave__configuration
 TimeSlaveConfig ParseConfig(const std::string& path)
 {
     const score::json::JsonParser parser;

@@ -34,6 +34,7 @@ namespace ts
 namespace details
 {
 
+// req-Id: comp_req__time_slave__platform_support
 RawSocketImpl::RawSocketImpl(OsSyscalls* /*sys*/) noexcept {}
 
 RawSocketImpl::~RawSocketImpl()
@@ -67,6 +68,7 @@ void RawSocketImpl::Close()
     iface_.clear();
 }
 
+// req-Id: comp_req__time_slave__sync_reception
 int RawSocketImpl::Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts, int timeout_ms)
 {
     if (fd_ < 0 || buf == nullptr || buf_len == 0)
@@ -79,6 +81,7 @@ int RawSocketImpl::Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts
     return qnx_raw_recv(fd_, buf, static_cast<int>(buf_len), &hwts, nonblock);
 }
 
+// req-Id: comp_req__time_slave__sync_publishing
 int RawSocketImpl::Send(const void* buf, int len, ::timespec& hwts)
 {
     if (fd_ < 0 || buf == nullptr || len <= 0)
