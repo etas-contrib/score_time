@@ -29,6 +29,9 @@ GptpIpcReceiver::~GptpIpcReceiver()
     Close();
 }
 
+// req-Id: comp_req__ts_client__shared_memory_mgmt
+// req-Id: comp_req__ts_client__shm_validation
+// req-Id: comp_req__ts_client__platform_support
 bool GptpIpcReceiver::Open(const std::string& ipc_name)
 {
     if (shm_resource_ != nullptr)
@@ -60,6 +63,9 @@ bool GptpIpcReceiver::Open(const std::string& ipc_name)
     return true;
 }
 
+// req-Id: comp_req__ts_client__receiver_multi_reader
+// req-Id: comp_req__ts_client__data_validity
+// req-Id: comp_req__ts_client__seqlock_protocol
 std::optional<score::ts::GptpIpcData> GptpIpcReceiver::Receive()
 {
     if (region_ == nullptr)
@@ -94,6 +100,7 @@ std::optional<score::ts::GptpIpcData> GptpIpcReceiver::Receive()
     return std::nullopt;
 }
 
+// req-Id: comp_req__ts_client__shared_memory_mgmt
 void GptpIpcReceiver::Close()
 {
     shm_resource_.reset();

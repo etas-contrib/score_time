@@ -31,16 +31,15 @@ constexpr char kGptpIpcName[] = "/gptp_ptp_info";
 /// Magic number to validate the shared memory region ('GPTP').
 inline constexpr std::uint32_t kGptpIpcMagic = 0x47505450U;
 
-/**
- * @brief Shared memory layout for gPTP IPC (seqlock protocol).
- *
- * Single-writer (TimeSlave), multi-reader (TimeDaemon via ShmPTPEngine).
- * Aligned to 64 bytes (cache line) to avoid false sharing.
- *
- * Seqlock protocol:
- *  - Writer: seq++ (odd = writing), write data, seq_confirm = seq (even = readable)
- *  - Reader: read seq, read data, read seq_confirm; retry if seq != seq_confirm or odd
- */
+// req-Id: comp_req__ts_client__cache_optimization
+/// @brief Shared memory layout for gPTP IPC (seqlock protocol).
+///
+/// Single-writer (TimeSlave), multi-reader (TimeDaemon via ShmPTPEngine).
+/// Aligned to 64 bytes (cache line) to avoid false sharing.
+///
+/// Seqlock protocol:
+///  - Writer: seq++ (odd = writing), write data, seq_confirm = seq (even = readable)
+///  - Reader: read seq, read data, read seq_confirm; retry if seq != seq_confirm or odd
 struct alignas(64) GptpIpcRegion
 {
     std::atomic<std::uint32_t> magic{kGptpIpcMagic};

@@ -21,6 +21,7 @@ namespace score
 namespace ts
 {
 
+// req-Id: comp_req__ts_client__sync_status_data
 /// @brief IPC-layer status flags transmitted from TimeSlave to TimeDaemon.
 struct GptpIpcStatus
 {
@@ -31,6 +32,7 @@ struct GptpIpcStatus
     bool is_correct;
 };
 
+// req-Id: comp_req__ts_client__sync_fup_data
 /// @brief Sync/FollowUp snapshot from latest received gPTP sync cycle.
 struct GptpIpcSyncFupData
 {
@@ -45,6 +47,7 @@ struct GptpIpcSyncFupData
     std::uint64_t clock_identity;
 };
 
+// req-Id: comp_req__ts_client__pdelay_data
 /// @brief Peer-delay measurement snapshot from latest completed pDelay cycle.
 struct GptpIpcPDelayData
 {
@@ -62,6 +65,7 @@ struct GptpIpcPDelayData
     std::uint64_t resp_clock_identity;
 };
 
+// req-Id: comp_req__ts_client__time_correlation_data
 /// @brief IPC data snapshot written by TimeSlave and read by TimeDaemon.
 ///
 /// This type is internal to ts_client and intentionally decoupled from
