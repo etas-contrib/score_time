@@ -19,6 +19,7 @@ namespace score
 namespace td
 {
 
+// req-Id: comp_req__time_daemon__client_read_access
 std::shared_ptr<SvtReceiver> CreateSvtReceiver()
 {
     return std::make_shared<ReceiverImpl<svt::TimeBaseSnapshot>>(kSvtShmemPath);
