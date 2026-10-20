@@ -10,6 +10,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
+
 #include "score/time_slave/src/gptp/details/raw_socket_impl.h"
 
 #include <arpa/inet.h>
@@ -133,6 +134,7 @@ void RawSocketImpl::Close()
     iface_.clear();
 }
 
+// req-Id: comp_req__time_slave__sync_reception, comp_req__time_slave__platform_support
 int RawSocketImpl::Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts, int timeout_ms)
 {
     const int fd = fd_.load(std::memory_order_acquire);
@@ -174,6 +176,7 @@ int RawSocketImpl::Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts
     return len;
 }
 
+// req-Id: comp_req__time_slave__platform_support
 int RawSocketImpl::Send(const void* buf, int len, ::timespec& hwts)
 {
     const int fd = fd_.load(std::memory_order_acquire);
