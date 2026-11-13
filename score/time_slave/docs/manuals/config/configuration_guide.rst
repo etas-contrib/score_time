@@ -68,24 +68,36 @@ The following table lists all available options and their default values as defi
    * - ``iface_name``
      - ``"emac0"``
      - The network interface to use for gPTP traffic.
-   * - ``pdelay_interval_ms``
+   * - ``pdelay_req_interval_ms``
      - ``1000``
-     - The interval in milliseconds for sending Peer-Delay measurement requests.
+     - The interval in milliseconds for sending Peer-Delay measurement requests. Valid range: 10..60000.
    * - ``pdelay_warmup_ms``
      - ``2000``
-     - The initial delay in milliseconds before the first Peer-Delay request is sent.
+     - The initial delay in milliseconds before the first Peer-Delay request is sent. Valid range: 0..60000.
    * - ``sync_timeout_ms``
      - ``3300``
-     - The time in milliseconds without receiving a PTP Sync message before a timeout is declared and the clock is considered unreliable.
+     - The time in milliseconds without receiving a PTP Sync message before a timeout is declared and the clock is considered unreliable. Valid range: 10..60000.
    * - ``jump_future_threshold_ns``
      - ``500'000'000``
-     - The threshold in nanoseconds (500 ms) for detecting a significant forward time jump.
+     - The threshold in nanoseconds (500 ms) for detecting a significant forward time jump. Must be >= 0.
    * - ``domain_number``
      - ``0``
-     - The gPTP domain number. The TimeSlave will only interact with a PTP master in the same domain.
+     - The gPTP domain number. The TimeSlave will only interact with a PTP master in the same domain. Valid range: 0..127.
    * - ``phc_config``
      - ``disabled``
      - Configuration for hardware clock (PHC) adjustments. Disabled by default.
+
+Validation
+----------
+
+``time_slave_config_schema.json`` defines the type and range (``minimum`` /
+``maximum``) of every option. The TimeSlave enforces these constraints when it
+loads the file: if any value has the wrong type (including a JSON boolean where
+an integer is expected) or lies outside its allowed range, a fatal error naming
+the offending field is logged and the process terminates. The same happens if
+the file cannot be read or parsed. Values are never silently clamped or
+applied, so a typo such as ``"domain_number": 128`` is reported at startup
+instead of causing every Sync message to be ignored.
 
 PHC configuration
 -----------------

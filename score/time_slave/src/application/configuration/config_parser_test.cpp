@@ -163,6 +163,80 @@ TEST(ConfigParserTest, FullExampleConfigRoundTrip)
     EXPECT_TRUE(cfg.qnx.see_sent);
 }
 
+// ---- Schema validation (issue #314) ----------------------------------------
+
+struct RangeCase
+{
+    const char* name;
+    const char* json;
+};
+
+class ConfigParserInvalidTest : public TestWithParam<RangeCase>
+{
+};
+
+TEST_P(ConfigParserInvalidTest, RejectsValueViolatingSchema)
+{
+    const auto path = WriteTempFile(std::string{"invalid_"} + GetParam().name + ".json", GetParam().json);
+    EXPECT_DEATH(ParseConfig(path), "");
+}
+
+const RangeCase kInvalidCases[] = {
+    {"domain_above_max", R"({"domain_number": 128})"},
+    {"domain_negative", R"({"domain_number": -1})"},
+    {"domain_wraps_uint8", R"({"domain_number": 256})"},
+    {"pdelay_interval_below_min", R"({"pdelay_req_interval_ms": 9})"},
+    {"pdelay_interval_above_max", R"({"pdelay_req_interval_ms": 60001})"},
+    {"pdelay_warmup_negative", R"({"pdelay_warmup_ms": -1})"},
+    {"pdelay_warmup_above_max", R"({"pdelay_warmup_ms": 60001})"},
+    {"sync_timeout_below_min", R"({"sync_timeout_ms": 9})"},
+    {"sync_timeout_above_max", R"({"sync_timeout_ms": 60001})"},
+    {"jump_threshold_negative", R"({"jump_future_threshold_ns": -1})"},
+    {"step_threshold_negative", R"({"phc": {"step_threshold_ns": -1}})"},
+    {"bool_for_integer", R"({"domain_number": true})"},
+    {"bool_false_for_integer", R"({"sync_timeout_ms": false})"},
+    {"bool_for_nested_integer", R"({"phc": {"step_threshold_ns": true}})"},
+    {"string_for_integer", R"({"domain_number": "5"})"},
+    {"fractional_for_integer", R"({"domain_number": 1.5})"},
+    {"integer_for_string", R"({"iface_name": 5})"},
+    {"integer_for_bool", R"({"phc": {"enabled": 1}})"},
+    {"string_for_bool", R"({"qnx": {"see_sent": "true"}})"},
+    {"phc_not_object", R"({"phc": 1})"},
+    {"qnx_not_object", R"({"qnx": 1})"},
+    {"root_not_object", R"([])"},
+};
+
+INSTANTIATE_TEST_SUITE_P(Schema, ConfigParserInvalidTest, ValuesIn(kInvalidCases), [](const auto& info) {
+    return std::string{info.param.name};
+});
+
+TEST(ConfigParserTest, AcceptsBoundaryValues)
+{
+    const auto lo = ParseConfig(WriteTempFile("bounds_lo.json",
+                                              R"({"domain_number": 0, "pdelay_req_interval_ms": 10,
+                                                  "pdelay_warmup_ms": 0, "sync_timeout_ms": 10,
+                                                  "jump_future_threshold_ns": 0,
+                                                  "phc": {"step_threshold_ns": 0}})"));
+    EXPECT_EQ(lo.engine_opts.domain_number, 0);
+    EXPECT_EQ(lo.engine_opts.pdelay_req_interval_ms, 10);
+    EXPECT_EQ(lo.engine_opts.pdelay_warmup_ms, 0);
+    EXPECT_EQ(lo.engine_opts.sync_timeout_ms, 10);
+    EXPECT_EQ(lo.engine_opts.jump_future_threshold_ns, 0);
+
+    const auto hi = ParseConfig(WriteTempFile("bounds_hi.json",
+                                              R"({"domain_number": 127, "pdelay_req_interval_ms": 60000,
+                                                  "pdelay_warmup_ms": 60000, "sync_timeout_ms": 60000})"));
+    EXPECT_EQ(hi.engine_opts.domain_number, 127);
+    EXPECT_EQ(hi.engine_opts.pdelay_req_interval_ms, 60000);
+    EXPECT_EQ(hi.engine_opts.pdelay_warmup_ms, 60000);
+    EXPECT_EQ(hi.engine_opts.sync_timeout_ms, 60000);
+}
+
+TEST(ConfigParserTest, MissingFileTerminates)
+{
+    EXPECT_DEATH(ParseConfig(testing::TempDir() + "does_not_exist.json"), "");
+}
+
 }  // namespace
 }  // namespace ts
 }  // namespace score
