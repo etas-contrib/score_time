@@ -15,14 +15,11 @@
 #include "score/time_slave/src/application/configuration/config_limits.h"
 
 #include "score/json/json_parser.h"
-#include "score/mw/log/logging.h"
-#include "score/time_slave/src/common/logging_contexts.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
-#include <cstdlib>
-#include <functional>
-#include <cstddef>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -31,232 +28,221 @@ namespace score
 {
 namespace ts
 {
-
 namespace
 {
 
-using score::json::Error;
-using score::json::GetAttribute;
-using score::json::MakeError;
 using score::json::Object;
 
-/// Log a fatal configuration error and terminate the process.
-///
-/// LogFatal() alone only logs; an invalid configuration must never be applied,
-/// so terminate explicitly.
-[[noreturn]] void FatalConfigError(std::string_view key, std::string_view reason)
-{
-    score::mw::log::LogFatal(kTimeSlaveAppContext) << "Config field '" << key << "' " << reason;
-    std::abort();
-}
+namespace cs = config_schema;
 
-/// Fatal out if @p result is a type/parse error (as opposed to the caller having
-/// already detected "key not present" via Object::find()).
-template <typename ResultT>
-void FatalOnTypeError(const ResultT& result, std::string_view key)
-{
-    if (!result.has_value() && result.error() != MakeError(Error::kKeyNotFound))
-    {
-        FatalConfigError(key, std::string{"has wrong type: "} + std::string{result.error().Message()});
-    }
-}
-
-/// Reads the properties of one JSON object, driven by the schema-generated key table.
+/// Reads the properties of one JSON object and records every violation of the schema in
+/// @c errors (it never stops at the first one, and never applies an invalid value).
 ///
-/// Every property is parsed through the generated constants (key, range, default), and
-/// Finish() enforces the schema both ways: keys in the file that the schema does not
-/// declare are rejected ("additionalProperties": false), and schema properties this
-/// parser never read are reported, so a schema change cannot be silently ignored.
+/// Types are checked strictly: score::json::Any::As<arithmetic>() converts JSON booleans to
+/// numbers and numbers to booleans, which the schema forbids, so the stored kind is checked first.
+/// Finish() rejects keys the schema does not declare ("additionalProperties": false).
 class ObjectReader
 {
   public:
     template <std::size_t N>
-    ObjectReader(const Object& obj, std::string_view scope, const std::string_view (&schema_keys)[N])
-        : obj_{obj}, scope_{scope}, schema_keys_{schema_keys}, schema_key_count_{N}
+    ObjectReader(const Object& obj,
+                 std::string_view scope,
+                 const std::array<std::string_view, N>& schema_keys,
+                 std::vector<std::string>& errors)
+        : obj_{obj}, scope_{scope}, keys_begin_{schema_keys.begin()}, keys_end_{schema_keys.end()}, errors_{errors}
     {
     }
 
-    /// Read a string property; leaves @p out unchanged if key is missing.
-    void String(const config_schema::StringProperty& prop, std::string& out)
+    /// Read a string property; leaves @p out unchanged if the key is missing or invalid.
+    void String(const cs::StringProperty& prop, std::string& out)
     {
-        Mark(prop.key);
-        const auto result = GetAttribute<std::string_view>(std::cref(obj_), prop.key);
-        FatalOnTypeError(result, prop.key);
-        if (result.has_value())
+        const auto* value = Find(prop.key);
+        if (value == nullptr)
         {
-            out = std::string{result.value()};
+            return;
         }
+        const auto result = value->As<std::string_view>();
+        if (!result.has_value())
+        {
+            Error(prop.key, "has wrong type: expected string");
+            return;
+        }
+        out = std::string{result.value()};
     }
 
     /// Read an integer property and validate it against the schema range; leaves @p out
-    /// unchanged if key is missing. Terminates on wrong type (including JSON booleans) or
-    /// out-of-range values.
-    template <typename T>
-    void Int(const config_schema::IntProperty& prop, T& out)
+    /// unchanged if the key is missing or invalid. The property is a template argument so that
+    /// the compiler verifies the schema range fits into the destination type @p T.
+    template <const cs::IntProperty& Prop, typename T>
+    void Int(T& out)
     {
-        Mark(prop.key);
-        // Any::As<arithmetic>() silently converts JSON booleans; the schema demands "integer",
-        // so require the stored value to be a genuine JSON number first.
-        const auto it = obj_.find(prop.key);
-        if (it != obj_.end() && !it->second.As<score::json::Number>().has_value())
-        {
-            FatalConfigError(prop.key, "has wrong type: expected integer");
-        }
-        const auto result = GetAttribute<std::int64_t>(std::cref(obj_), prop.key);
-        FatalOnTypeError(result, prop.key);
-        if (result.has_value())
-        {
-            const std::int64_t value = result.value();
-            if (value < prop.min || value > prop.max)
-            {
-                FatalConfigError(prop.key,
-                                 "is out of range: " + std::to_string(value) + " not in [" +
-                                     std::to_string(prop.min) + ", " + std::to_string(prop.max) + "]");
-            }
-            out = static_cast<T>(value);
-        }
-    }
+        static_assert(Prop.min >= std::numeric_limits<T>::min() && Prop.max <= std::numeric_limits<T>::max(),
+                      "schema range of this property does not fit into the C++ field type");
 
-    /// Read a bool property; leaves @p out unchanged if key is missing.
-    void Bool(const config_schema::BoolProperty& prop, bool& out)
-    {
-        Mark(prop.key);
-        // Any::As<bool>() silently converts JSON numbers; require a genuine JSON boolean.
-        const auto it = obj_.find(prop.key);
-        if (it != obj_.end() && it->second.As<score::json::Number>().has_value())
+        const auto* value = Find(Prop.key);
+        if (value == nullptr)
         {
-            FatalConfigError(prop.key, "has wrong type: expected boolean");
+            return;
         }
-        const auto result = GetAttribute<bool>(std::cref(obj_), prop.key);
-        FatalOnTypeError(result, prop.key);
-        if (result.has_value())
+        // Number::As<int64_t>() is a lossless cast: it rejects fractional and out-of-int64 values.
+        const auto number = value->As<score::json::Number>();
+        if (!number.has_value())
         {
-            out = result.value();
+            Error(Prop.key, "has wrong type: expected integer");
+            return;
         }
-    }
-
-    /// Read a nested object property. Returns nullptr if the key is missing.
-    const Object* NestedObject(std::string_view key)
-    {
-        Mark(key);
-        const auto result = GetAttribute<Object>(std::cref(obj_), key);
+        const auto result = number.value().get().As<std::int64_t>();
         if (!result.has_value())
         {
-            if (result.error() != MakeError(Error::kKeyNotFound))
-            {
-                FatalConfigError(key, std::string{"is not an object: "} + std::string{result.error().Message()});
-            }
+            Error(Prop.key, "has wrong type: expected integer");
+            return;
+        }
+        if (result.value() < Prop.min || result.value() > Prop.max)
+        {
+            Error(Prop.key,
+                  "is out of range: " + std::to_string(result.value()) + " not in [" + std::to_string(Prop.min) + ", " +
+                      std::to_string(Prop.max) + "]");
+            return;
+        }
+        out = static_cast<T>(result.value());
+    }
+
+    /// Read a bool property; leaves @p out unchanged if the key is missing or invalid.
+    void Bool(const cs::BoolProperty& prop, bool& out)
+    {
+        const auto* value = Find(prop.key);
+        if (value == nullptr)
+        {
+            return;
+        }
+        const auto result = value->As<bool>();
+        if (value->As<score::json::Number>().has_value() || !result.has_value())
+        {
+            Error(prop.key, "has wrong type: expected boolean");
+            return;
+        }
+        out = result.value();
+    }
+
+    /// Read a nested object property. Returns nullptr if the key is missing or not an object.
+    const Object* NestedObject(std::string_view key)
+    {
+        const auto* value = Find(key);
+        if (value == nullptr)
+        {
+            return nullptr;
+        }
+        const auto result = value->As<Object>();
+        if (!result.has_value())
+        {
+            Error(key, "has wrong type: expected object");
             return nullptr;
         }
         return &result.value().get();
     }
 
-    /// Must be called after all properties were read.
-    void Finish() const
+    /// Report keys that the schema does not declare. Call after all properties were read.
+    void Finish()
     {
         for (const auto& entry : obj_)
         {
             const auto key = entry.first.GetAsStringView();
-            if (std::find(schema_keys_, schema_keys_ + schema_key_count_, key) == schema_keys_ + schema_key_count_)
+            if (std::find(keys_begin_, keys_end_, key) == keys_end_)
             {
-                FatalConfigError(Qualified(key), "is not defined by the configuration schema");
-            }
-        }
-        for (const auto* it = schema_keys_; it != schema_keys_ + schema_key_count_; ++it)
-        {
-            const auto key = *it;
-            if (std::find(read_.begin(), read_.end(), key) == read_.end())
-            {
-                FatalConfigError(Qualified(key), "is defined by the schema but not handled by the parser");
+                Error(key, "is not defined by the configuration schema");
             }
         }
     }
 
   private:
-    void Mark(std::string_view key)
+    const score::json::Any* Find(std::string_view key) const
     {
-        read_.push_back(key);
+        const auto it = obj_.find(key);
+        return it == obj_.end() ? nullptr : &it->second;
     }
 
-    std::string Qualified(std::string_view key) const
+    void Error(std::string_view key, const std::string& reason)
     {
-        return scope_.empty() ? std::string{key} : std::string{scope_} + "." + std::string{key};
+        std::string name{scope_};
+        name += scope_.empty() ? "" : ".";
+        name += key;
+        errors_.push_back("Config field '" + name + "' " + reason);
     }
 
     const Object& obj_;
     std::string_view scope_;
-    const std::string_view* schema_keys_;
-    std::size_t schema_key_count_;
-    std::vector<std::string_view> read_;
+    const std::string_view* keys_begin_;
+    const std::string_view* keys_end_;
+    std::vector<std::string>& errors_;
 };
 
 /// Parse the optional "phc" nested object. If absent, @p cfg keeps defaults.
-void ParsePhcConfig(ObjectReader& root, details::PhcConfig& cfg)
+void ParsePhcConfig(ObjectReader& root, std::vector<std::string>& errors, details::PhcConfig& cfg)
 {
-    const Object* phc_obj = root.NestedObject("phc");
+    const Object* phc_obj = root.NestedObject(cs::kPhcKey);
     if (phc_obj == nullptr)
     {
         return;
     }
-    ObjectReader reader{*phc_obj, "phc", config_schema::kPhcKeys};
-    reader.Bool(config_schema::kPhcEnabled, cfg.enabled);
-    reader.String(config_schema::kPhcDevice, cfg.device);
-    reader.Int(config_schema::kPhcStepThresholdNs, cfg.step_threshold_ns);
+    ObjectReader reader{*phc_obj, cs::kPhcKey, cs::kPhcKeys, errors};
+    reader.Bool(cs::kPhcEnabled, cfg.enabled);
+    reader.String(cs::kPhcDevice, cfg.device);
+    reader.Int<cs::kPhcStepThresholdNs>(cfg.step_threshold_ns);
     reader.Finish();
 }
 
 /// Parse the optional "qnx" nested object. If absent, @p qnx keeps defaults.
-void ParseQnxConfig(ObjectReader& root, TimeSlaveConfig::QnxSettings& qnx)
+void ParseQnxConfig(ObjectReader& root, std::vector<std::string>& errors, TimeSlaveConfig::QnxSettings& qnx)
 {
-    const Object* qnx_obj = root.NestedObject("qnx");
+    const Object* qnx_obj = root.NestedObject(cs::kQnxKey);
     if (qnx_obj == nullptr)
     {
         return;
     }
-    ObjectReader reader{*qnx_obj, "qnx", config_schema::kQnxKeys};
-    reader.String(config_schema::kQnxBpfDevicePath, qnx.bpf_device_path);
-    reader.Bool(config_schema::kQnxSeeSent, qnx.see_sent);
+    ObjectReader reader{*qnx_obj, cs::kQnxKey, cs::kQnxKeys, errors};
+    reader.String(cs::kQnxBpfDevicePath, qnx.bpf_device_path);
+    reader.Bool(cs::kQnxSeeSent, qnx.see_sent);
     reader.Finish();
 }
 
 }  // namespace
 
-TimeSlaveConfig ParseConfig(const std::string& path)
+ConfigParseResult ParseConfig(const std::string& path)
 {
+    ConfigParseResult result;
     const score::json::JsonParser parser;
-    auto root_result = parser.FromFile(path);
+    const auto root_result = parser.FromFile(path);
     if (!root_result.has_value())
     {
-        score::mw::log::LogFatal(kTimeSlaveAppContext)
-            << "Failed to parse config file '" << path << "': " << root_result.error().Message();
-        std::abort();
+        result.errors.push_back("Failed to parse config file '" + path +
+                                "': " + std::string{root_result.error().Message()});
+        return result;
     }
 
-    auto obj_result = root_result.value().As<Object>();
+    const auto obj_result = root_result.value().As<Object>();
     if (!obj_result.has_value())
     {
-        score::mw::log::LogFatal(kTimeSlaveAppContext) << "Config file '" << path << "' root is not a JSON object";
-        std::abort();
+        result.errors.push_back("Config file '" + path + "' root is not a JSON object");
+        return result;
     }
-    const auto& obj = obj_result.value().get();
 
-    TimeSlaveConfig cfg;
+    auto& cfg = result.config;
     auto& opts = cfg.engine_opts;
 
-    ObjectReader reader{obj, "", config_schema::kRootKeys};
-    reader.String(config_schema::kIfaceName, opts.iface_name);
-    reader.Int(config_schema::kDomainNumber, opts.domain_number);
-    reader.Int(config_schema::kPdelayReqIntervalMs, opts.pdelay_req_interval_ms);
-    reader.Int(config_schema::kPdelayWarmupMs, opts.pdelay_warmup_ms);
-    reader.Int(config_schema::kSyncTimeoutMs, opts.sync_timeout_ms);
-    reader.Int(config_schema::kJumpFutureThresholdNs, opts.jump_future_threshold_ns);
-    reader.String(config_schema::kShmPath, cfg.shm_path);
+    ObjectReader reader{obj_result.value().get(), "", cs::kRootKeys, result.errors};
+    reader.String(cs::kIfaceName, opts.iface_name);
+    reader.Int<cs::kDomainNumber>(opts.domain_number);
+    reader.Int<cs::kPdelayReqIntervalMs>(opts.pdelay_req_interval_ms);
+    reader.Int<cs::kPdelayWarmupMs>(opts.pdelay_warmup_ms);
+    reader.Int<cs::kSyncTimeoutMs>(opts.sync_timeout_ms);
+    reader.Int<cs::kJumpFutureThresholdNs>(opts.jump_future_threshold_ns);
+    reader.String(cs::kShmPath, cfg.shm_path);
 
-    ParsePhcConfig(reader, opts.phc_config);
-    ParseQnxConfig(reader, cfg.qnx);
+    ParsePhcConfig(reader, result.errors, opts.phc_config);
+    ParseQnxConfig(reader, result.errors, cfg.qnx);
     reader.Finish();
 
-    return cfg;
+    return result;
 }
 
 }  // namespace ts

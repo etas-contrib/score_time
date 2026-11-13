@@ -92,21 +92,21 @@ Validation
 
 ``time_slave_config_schema.json`` defines the type and range (``minimum`` /
 ``maximum``) of every option. The TimeSlave enforces these constraints when it
-loads the file: if any value has the wrong type (including a JSON boolean where
-an integer is expected) or lies outside its allowed range, a fatal error naming
-the offending field is logged and the process terminates. The same happens if
-the file cannot be read or parsed. Values are never silently clamped or
-applied, so a typo such as ``"domain_number": 128`` is reported at startup
-instead of causing every Sync message to be ignored.
+loads the file. If any value has the wrong type (including a JSON boolean where
+an integer is expected), lies outside its allowed range, or if the file contains
+a key the schema does not define (matching ``"additionalProperties": false``,
+for example a misspelled option name), the TimeSlave logs one error naming each
+offending field and **refuses to start** (initialization fails). The same
+happens if the file cannot be read or parsed. Values are never silently
+clamped or applied, so a typo such as ``"domain_number": 128`` is reported at
+startup instead of causing every Sync message to be ignored.
 
-Keys that the schema does not define (for example a misspelled option name)
-are rejected in the same way, matching ``"additionalProperties": false``.
-
-The schema is the single source of truth: the option names, ranges and
-defaults used by the parser are generated from
-``time_slave_config_schema.json`` at build time, so changing a range in the
-schema changes the enforced range without any code edit. The parser also fails
-loudly if the schema gains a property it does not yet handle.
+The parser enforces the keys, ranges and defaults listed in
+``config_limits.h``. A unit test (``config_schema_consistency_test``) compares
+that table with ``time_slave_config_schema.json`` in both directions and fails
+if the schema uses a constraint the parser does not implement, so the two
+cannot drift apart unnoticed. When changing the schema, update
+``config_limits.h`` accordingly.
 
 PHC configuration
 -----------------

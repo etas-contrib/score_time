@@ -20,6 +20,8 @@
 #include <fstream>
 #include <limits>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace score
 {
@@ -40,13 +42,21 @@ std::string WriteTempFile(const std::string& name, const std::string& content)
     return path;
 }
 
+/// Parse @p path and require success.
+TimeSlaveConfig ParseOk(const std::string& path)
+{
+    const auto result = ParseConfig(path);
+    EXPECT_TRUE(result.ok()) << (result.errors.empty() ? "" : result.errors.front());
+    return result.config;
+}
+
 TEST(ConfigParserTest, EmptyObjectReturnsDefaults)
 {
     const auto path = WriteTempFile("empty_config.json", "{}");
-    const auto cfg = ParseConfig(path);
+    const auto cfg = ParseOk(path);
 
-    // Defaults come from the schema via the generated header, so a schema default change
-    // that is not mirrored in the C++ option structs fails here.
+    // The table mirrors the schema defaults (see config_schema_consistency_test); the C++
+    // option structs must agree with it.
     namespace cs = config_schema;
     EXPECT_EQ(cfg.engine_opts.iface_name, cs::kIfaceName.default_value);
     EXPECT_EQ(cfg.engine_opts.domain_number, cs::kDomainNumber.default_value);
@@ -74,7 +84,7 @@ TEST(ConfigParserTest, ParseAllTopLevelFields)
         "shm_path": "/custom_shm"
     })";
     const auto path = WriteTempFile("full_config.json", json);
-    const auto cfg = ParseConfig(path);
+    const auto cfg = ParseOk(path);
 
     EXPECT_EQ(cfg.engine_opts.iface_name, "eth1");
     EXPECT_EQ(cfg.engine_opts.domain_number, 5);
@@ -95,7 +105,7 @@ TEST(ConfigParserTest, ParsePhcConfig)
         }
     })";
     const auto path = WriteTempFile("phc_config.json", json);
-    const auto cfg = ParseConfig(path);
+    const auto cfg = ParseOk(path);
 
     EXPECT_TRUE(cfg.engine_opts.phc_config.enabled);
     EXPECT_EQ(cfg.engine_opts.phc_config.device, "ptp0");
@@ -111,7 +121,7 @@ TEST(ConfigParserTest, ParseQnxConfig)
         }
     })";
     const auto path = WriteTempFile("qnx_config.json", json);
-    const auto cfg = ParseConfig(path);
+    const auto cfg = ParseOk(path);
 
     EXPECT_EQ(cfg.qnx.bpf_device_path, "/dev/bpf_test");
     EXPECT_TRUE(cfg.qnx.see_sent);
@@ -123,7 +133,7 @@ TEST(ConfigParserTest, ParsePartialFields)
         "iface_name": "eth2"
     })";
     const auto path = WriteTempFile("partial_config.json", json);
-    const auto cfg = ParseConfig(path);
+    const auto cfg = ParseOk(path);
 
     // Only iface_name changed; everything else keeps default.
     EXPECT_EQ(cfg.engine_opts.iface_name, "eth2");
@@ -156,7 +166,7 @@ TEST(ConfigParserTest, FullExampleConfigRoundTrip)
                                     "    }\n"
                                     "}\n");
 
-    const auto cfg = ParseConfig(path);
+    const auto cfg = ParseOk(path);
 
     EXPECT_EQ(cfg.engine_opts.iface_name, "emac0");
     EXPECT_EQ(cfg.engine_opts.domain_number, 0);
@@ -174,78 +184,120 @@ TEST(ConfigParserTest, FullExampleConfigRoundTrip)
 
 // ---- Schema validation (issue #314) ----------------------------------------
 
-struct RangeCase
+/// Every key of the schema set to a non-default value, so a property the parser forgets to
+/// read is caught by AllPropertiesAreApplied.
+constexpr const char* kAllNonDefault = R"({
+    "iface_name": "eth9",
+    "domain_number": 7,
+    "pdelay_req_interval_ms": 250,
+    "pdelay_warmup_ms": 11,
+    "sync_timeout_ms": 777,
+    "jump_future_threshold_ns": 123456,
+    "shm_path": "/other_shm",
+    "phc": {"enabled": true, "device": "/dev/ptp7", "step_threshold_ns": 4242},
+    "qnx": {"bpf_device_path": "/dev/bpf7", "see_sent": true}
+})";
+
+TEST(ConfigParserTest, AllPropertiesAreApplied)
+{
+    namespace cs = config_schema;
+    const std::string json{kAllNonDefault};
+    const auto expect_present = [&](const auto& keys) {
+        for (const auto key : keys)
+        {
+            EXPECT_NE(json.find("\"" + std::string{key} + "\""), std::string::npos)
+                << "add '" << key << "' to kAllNonDefault";
+        }
+    };
+    expect_present(cs::kRootKeys);
+    expect_present(cs::kPhcKeys);
+    expect_present(cs::kQnxKeys);
+
+    const auto cfg = ParseOk(WriteTempFile("all_non_default.json", kAllNonDefault));
+    EXPECT_EQ(cfg.engine_opts.iface_name, "eth9");
+    EXPECT_EQ(cfg.engine_opts.domain_number, 7);
+    EXPECT_EQ(cfg.engine_opts.pdelay_req_interval_ms, 250);
+    EXPECT_EQ(cfg.engine_opts.pdelay_warmup_ms, 11);
+    EXPECT_EQ(cfg.engine_opts.sync_timeout_ms, 777);
+    EXPECT_EQ(cfg.engine_opts.jump_future_threshold_ns, 123456);
+    EXPECT_EQ(cfg.shm_path, "/other_shm");
+    EXPECT_TRUE(cfg.engine_opts.phc_config.enabled);
+    EXPECT_EQ(cfg.engine_opts.phc_config.device, "/dev/ptp7");
+    EXPECT_EQ(cfg.engine_opts.phc_config.step_threshold_ns, 4242);
+    EXPECT_EQ(cfg.qnx.bpf_device_path, "/dev/bpf7");
+    EXPECT_TRUE(cfg.qnx.see_sent);
+}
+
+struct InvalidCase
 {
     const char* name;
     const char* json;
+    const char* expected_field;  // must appear in the error message
 };
 
-class ConfigParserInvalidTest : public TestWithParam<RangeCase>
+class ConfigParserInvalidTest : public TestWithParam<InvalidCase>
 {
 };
 
 TEST_P(ConfigParserInvalidTest, RejectsValueViolatingSchema)
 {
-    const auto path = WriteTempFile(std::string{"invalid_"} + GetParam().name + ".json", GetParam().json);
-    EXPECT_DEATH(ParseConfig(path), "");
+    const auto result =
+        ParseConfig(WriteTempFile(std::string{"invalid_"} + GetParam().name + ".json", GetParam().json));
+    ASSERT_FALSE(result.ok());
+    ASSERT_EQ(result.errors.size(), 1U);
+    EXPECT_NE(result.errors.front().find(GetParam().expected_field), std::string::npos) << result.errors.front();
 }
 
-const RangeCase kInvalidCases[] = {
-    {"domain_above_max", R"({"domain_number": 128})"},
-    {"domain_negative", R"({"domain_number": -1})"},
-    {"domain_wraps_uint8", R"({"domain_number": 256})"},
-    {"pdelay_interval_below_min", R"({"pdelay_req_interval_ms": 9})"},
-    {"pdelay_interval_above_max", R"({"pdelay_req_interval_ms": 60001})"},
-    {"pdelay_warmup_negative", R"({"pdelay_warmup_ms": -1})"},
-    {"pdelay_warmup_above_max", R"({"pdelay_warmup_ms": 60001})"},
-    {"sync_timeout_below_min", R"({"sync_timeout_ms": 9})"},
-    {"sync_timeout_above_max", R"({"sync_timeout_ms": 60001})"},
-    {"jump_threshold_negative", R"({"jump_future_threshold_ns": -1})"},
-    {"step_threshold_negative", R"({"phc": {"step_threshold_ns": -1}})"},
-    {"bool_for_integer", R"({"domain_number": true})"},
-    {"bool_false_for_integer", R"({"sync_timeout_ms": false})"},
-    {"bool_for_nested_integer", R"({"phc": {"step_threshold_ns": true}})"},
-    {"string_for_integer", R"({"domain_number": "5"})"},
-    {"fractional_for_integer", R"({"domain_number": 1.5})"},
-    {"integer_for_string", R"({"iface_name": 5})"},
-    {"integer_for_bool", R"({"phc": {"enabled": 1}})"},
-    {"string_for_bool", R"({"qnx": {"see_sent": "true"}})"},
-    {"unknown_root_key", R"({"pdelay_interval_ms": 500})"},
-    {"unknown_phc_key", R"({"phc": {"enable": true}})"},
-    {"unknown_qnx_key", R"({"qnx": {"see_send": true}})"},
-    {"phc_not_object", R"({"phc": 1})"},
-    {"qnx_not_object", R"({"qnx": 1})"},
-    {"root_not_object", R"([])"},
+const InvalidCase kInvalidCases[] = {
+    {"domain_above_max", R"({"domain_number": 128})", "domain_number"},
+    {"domain_negative", R"({"domain_number": -1})", "domain_number"},
+    {"domain_wraps_uint8", R"({"domain_number": 256})", "domain_number"},
+    {"pdelay_interval_below_min", R"({"pdelay_req_interval_ms": 9})", "pdelay_req_interval_ms"},
+    {"pdelay_interval_above_max", R"({"pdelay_req_interval_ms": 60001})", "pdelay_req_interval_ms"},
+    {"pdelay_warmup_negative", R"({"pdelay_warmup_ms": -1})", "pdelay_warmup_ms"},
+    {"pdelay_warmup_above_max", R"({"pdelay_warmup_ms": 60001})", "pdelay_warmup_ms"},
+    {"sync_timeout_below_min", R"({"sync_timeout_ms": 9})", "sync_timeout_ms"},
+    {"sync_timeout_above_max", R"({"sync_timeout_ms": 60001})", "sync_timeout_ms"},
+    {"jump_threshold_negative", R"({"jump_future_threshold_ns": -1})", "jump_future_threshold_ns"},
+    {"step_threshold_negative", R"({"phc": {"step_threshold_ns": -1}})", "phc.step_threshold_ns"},
+    {"bool_for_integer", R"({"domain_number": true})", "domain_number"},
+    {"bool_false_for_integer", R"({"sync_timeout_ms": false})", "sync_timeout_ms"},
+    {"bool_for_nested_integer", R"({"phc": {"step_threshold_ns": true}})", "phc.step_threshold_ns"},
+    {"string_for_integer", R"({"domain_number": "5"})", "domain_number"},
+    {"fractional_for_integer", R"({"domain_number": 1.5})", "domain_number"},
+    {"null_for_integer", R"({"domain_number": null})", "domain_number"},
+    {"integer_for_string", R"({"iface_name": 5})", "iface_name"},
+    {"integer_for_bool", R"({"phc": {"enabled": 1}})", "phc.enabled"},
+    {"string_for_bool", R"({"qnx": {"see_sent": "true"}})", "qnx.see_sent"},
+    {"unknown_root_key", R"({"pdelay_interval_ms": 500})", "pdelay_interval_ms"},
+    {"unknown_phc_key", R"({"phc": {"enable": true}})", "phc.enable"},
+    {"unknown_qnx_key", R"({"qnx": {"see_send": true}})", "qnx.see_send"},
+    {"phc_not_object", R"({"phc": 1})", "phc"},
+    {"qnx_not_object", R"({"qnx": 1})", "qnx"},
+    {"root_not_object", R"([])", "root is not a JSON object"},
+    {"not_json", R"({"domain_number": )", "Failed to parse"},
 };
 
 INSTANTIATE_TEST_SUITE_P(Schema, ConfigParserInvalidTest, ValuesIn(kInvalidCases), [](const auto& info) {
     return std::string{info.param.name};
 });
 
-TEST(ConfigParserTest, AcceptsBoundaryValues)
+TEST(ConfigParserTest, ReportsAllErrorsNotJustTheFirst)
 {
-    const auto lo = ParseConfig(WriteTempFile("bounds_lo.json",
-                                              R"({"domain_number": 0, "pdelay_req_interval_ms": 10,
-                                                  "pdelay_warmup_ms": 0, "sync_timeout_ms": 10,
-                                                  "jump_future_threshold_ns": 0,
-                                                  "phc": {"step_threshold_ns": 0}})"));
-    EXPECT_EQ(lo.engine_opts.domain_number, 0);
-    EXPECT_EQ(lo.engine_opts.pdelay_req_interval_ms, 10);
-    EXPECT_EQ(lo.engine_opts.pdelay_warmup_ms, 0);
-    EXPECT_EQ(lo.engine_opts.sync_timeout_ms, 10);
-    EXPECT_EQ(lo.engine_opts.jump_future_threshold_ns, 0);
-
-    const auto hi = ParseConfig(WriteTempFile("bounds_hi.json",
-                                              R"({"domain_number": 127, "pdelay_req_interval_ms": 60000,
-                                                  "pdelay_warmup_ms": 60000, "sync_timeout_ms": 60000})"));
-    EXPECT_EQ(hi.engine_opts.domain_number, 127);
-    EXPECT_EQ(hi.engine_opts.pdelay_req_interval_ms, 60000);
-    EXPECT_EQ(hi.engine_opts.pdelay_warmup_ms, 60000);
-    EXPECT_EQ(hi.engine_opts.sync_timeout_ms, 60000);
+    const auto result = ParseConfig(WriteTempFile(
+        "multi_error.json", R"({"domain_number": 128, "sync_timeout_ms": 1, "phc": {"enabled": 1}, "typo": 0})"));
+    EXPECT_EQ(result.errors.size(), 4U);
 }
 
-/// Boundaries are taken from the schema (generated header) rather than hard-coded.
-TEST(ConfigParserTest, SchemaRangesAreEnforcedExactly)
+TEST(ConfigParserTest, InvalidValueIsNeverApplied)
+{
+    const auto result = ParseConfig(WriteTempFile("not_applied.json", R"({"domain_number": 128})"));
+    ASSERT_FALSE(result.ok());
+    EXPECT_EQ(result.config.engine_opts.domain_number, config_schema::kDomainNumber.default_value);
+}
+
+/// Boundaries are taken from the table (which the consistency test ties to the schema).
+TEST(ConfigParserTest, RangeBoundariesAreEnforcedExactly)
 {
     namespace cs = config_schema;
     struct Field
@@ -264,26 +316,27 @@ TEST(ConfigParserTest, SchemaRangesAreEnforcedExactly)
     };
     for (const auto& f : fields)
     {
-        const auto make = [&](std::int64_t v) {
-            return WriteTempFile("range.json", f.prefix + std::to_string(v) + f.suffix);
+        const auto parse = [&](std::int64_t v) {
+            return ParseConfig(WriteTempFile("range.json", f.prefix + std::to_string(v) + f.suffix));
         };
-        // Valid boundaries parse (death-test free: ParseConfig would abort the test otherwise).
-        (void)ParseConfig(make(f.prop.min));
+        EXPECT_TRUE(parse(f.prop.min).ok()) << f.prop.key;
+        EXPECT_TRUE(parse(f.prop.max).ok()) << f.prop.key;
         if (f.prop.max != std::numeric_limits<std::int64_t>::max())
         {
-            (void)ParseConfig(make(f.prop.max));
-            EXPECT_DEATH(ParseConfig(make(f.prop.max + 1)), "") << f.prop.key;
+            EXPECT_FALSE(parse(f.prop.max + 1).ok()) << f.prop.key;
         }
         if (f.prop.min != std::numeric_limits<std::int64_t>::min())
         {
-            EXPECT_DEATH(ParseConfig(make(f.prop.min - 1)), "") << f.prop.key;
+            EXPECT_FALSE(parse(f.prop.min - 1).ok()) << f.prop.key;
         }
     }
 }
 
-TEST(ConfigParserTest, MissingFileTerminates)
+TEST(ConfigParserTest, MissingFileIsReported)
 {
-    EXPECT_DEATH(ParseConfig(testing::TempDir() + "does_not_exist.json"), "");
+    const auto result = ParseConfig(testing::TempDir() + "does_not_exist.json");
+    ASSERT_FALSE(result.ok());
+    EXPECT_NE(result.errors.front().find("does_not_exist.json"), std::string::npos);
 }
 
 }  // namespace
