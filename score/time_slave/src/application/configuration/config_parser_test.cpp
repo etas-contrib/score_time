@@ -12,9 +12,13 @@
  ********************************************************************************/
 #include "score/time_slave/src/application/configuration/config_parser.h"
 
+#include "score/time_slave/src/application/configuration/config_limits.h"
+
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <fstream>
+#include <limits>
 #include <string>
 
 namespace score
@@ -41,16 +45,21 @@ TEST(ConfigParserTest, EmptyObjectReturnsDefaults)
     const auto path = WriteTempFile("empty_config.json", "{}");
     const auto cfg = ParseConfig(path);
 
-    EXPECT_EQ(cfg.engine_opts.iface_name, "emac0");
-    EXPECT_EQ(cfg.engine_opts.domain_number, 0);
-    EXPECT_EQ(cfg.engine_opts.pdelay_req_interval_ms, 1000);
-    EXPECT_EQ(cfg.engine_opts.pdelay_warmup_ms, 2000);
-    EXPECT_EQ(cfg.engine_opts.sync_timeout_ms, 3300);
-    EXPECT_EQ(cfg.engine_opts.jump_future_threshold_ns, 500'000'000LL);
-    EXPECT_EQ(cfg.shm_path, "/gptp_shmem");
-    EXPECT_FALSE(cfg.engine_opts.phc_config.enabled);
-    EXPECT_EQ(cfg.qnx.bpf_device_path, score::ts::env::qnx::kBpfDevicePathDefault);
-    EXPECT_FALSE(cfg.qnx.see_sent);
+    // Defaults come from the schema via the generated header, so a schema default change
+    // that is not mirrored in the C++ option structs fails here.
+    namespace cs = config_schema;
+    EXPECT_EQ(cfg.engine_opts.iface_name, cs::kIfaceName.default_value);
+    EXPECT_EQ(cfg.engine_opts.domain_number, cs::kDomainNumber.default_value);
+    EXPECT_EQ(cfg.engine_opts.pdelay_req_interval_ms, cs::kPdelayReqIntervalMs.default_value);
+    EXPECT_EQ(cfg.engine_opts.pdelay_warmup_ms, cs::kPdelayWarmupMs.default_value);
+    EXPECT_EQ(cfg.engine_opts.sync_timeout_ms, cs::kSyncTimeoutMs.default_value);
+    EXPECT_EQ(cfg.engine_opts.jump_future_threshold_ns, cs::kJumpFutureThresholdNs.default_value);
+    EXPECT_EQ(cfg.shm_path, cs::kShmPath.default_value);
+    EXPECT_EQ(cfg.engine_opts.phc_config.enabled, cs::kPhcEnabled.default_value);
+    EXPECT_EQ(cfg.engine_opts.phc_config.device, cs::kPhcDevice.default_value);
+    EXPECT_EQ(cfg.engine_opts.phc_config.step_threshold_ns, cs::kPhcStepThresholdNs.default_value);
+    EXPECT_EQ(cfg.qnx.bpf_device_path, cs::kQnxBpfDevicePath.default_value);
+    EXPECT_EQ(cfg.qnx.see_sent, cs::kQnxSeeSent.default_value);
 }
 
 TEST(ConfigParserTest, ParseAllTopLevelFields)
@@ -201,6 +210,9 @@ const RangeCase kInvalidCases[] = {
     {"integer_for_string", R"({"iface_name": 5})"},
     {"integer_for_bool", R"({"phc": {"enabled": 1}})"},
     {"string_for_bool", R"({"qnx": {"see_sent": "true"}})"},
+    {"unknown_root_key", R"({"pdelay_interval_ms": 500})"},
+    {"unknown_phc_key", R"({"phc": {"enable": true}})"},
+    {"unknown_qnx_key", R"({"qnx": {"see_send": true}})"},
     {"phc_not_object", R"({"phc": 1})"},
     {"qnx_not_object", R"({"qnx": 1})"},
     {"root_not_object", R"([])"},
@@ -230,6 +242,43 @@ TEST(ConfigParserTest, AcceptsBoundaryValues)
     EXPECT_EQ(hi.engine_opts.pdelay_req_interval_ms, 60000);
     EXPECT_EQ(hi.engine_opts.pdelay_warmup_ms, 60000);
     EXPECT_EQ(hi.engine_opts.sync_timeout_ms, 60000);
+}
+
+/// Boundaries are taken from the schema (generated header) rather than hard-coded.
+TEST(ConfigParserTest, SchemaRangesAreEnforcedExactly)
+{
+    namespace cs = config_schema;
+    struct Field
+    {
+        const cs::IntProperty& prop;
+        std::string prefix;  // JSON text before the value
+        std::string suffix;  // JSON text after the value
+    };
+    const Field fields[] = {
+        {cs::kDomainNumber, "{\"domain_number\": ", "}"},
+        {cs::kPdelayReqIntervalMs, "{\"pdelay_req_interval_ms\": ", "}"},
+        {cs::kPdelayWarmupMs, "{\"pdelay_warmup_ms\": ", "}"},
+        {cs::kSyncTimeoutMs, "{\"sync_timeout_ms\": ", "}"},
+        {cs::kJumpFutureThresholdNs, "{\"jump_future_threshold_ns\": ", "}"},
+        {cs::kPhcStepThresholdNs, "{\"phc\": {\"step_threshold_ns\": ", "}}"},
+    };
+    for (const auto& f : fields)
+    {
+        const auto make = [&](std::int64_t v) {
+            return WriteTempFile("range.json", f.prefix + std::to_string(v) + f.suffix);
+        };
+        // Valid boundaries parse (death-test free: ParseConfig would abort the test otherwise).
+        (void)ParseConfig(make(f.prop.min));
+        if (f.prop.max != std::numeric_limits<std::int64_t>::max())
+        {
+            (void)ParseConfig(make(f.prop.max));
+            EXPECT_DEATH(ParseConfig(make(f.prop.max + 1)), "") << f.prop.key;
+        }
+        if (f.prop.min != std::numeric_limits<std::int64_t>::min())
+        {
+            EXPECT_DEATH(ParseConfig(make(f.prop.min - 1)), "") << f.prop.key;
+        }
+    }
 }
 
 TEST(ConfigParserTest, MissingFileTerminates)

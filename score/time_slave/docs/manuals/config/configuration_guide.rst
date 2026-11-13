@@ -99,6 +99,15 @@ the file cannot be read or parsed. Values are never silently clamped or
 applied, so a typo such as ``"domain_number": 128`` is reported at startup
 instead of causing every Sync message to be ignored.
 
+Keys that the schema does not define (for example a misspelled option name)
+are rejected in the same way, matching ``"additionalProperties": false``.
+
+The schema is the single source of truth: the option names, ranges and
+defaults used by the parser are generated from
+``time_slave_config_schema.json`` at build time, so changing a range in the
+schema changes the enforced range without any code edit. The parser also fails
+loudly if the schema gains a property it does not yet handle.
+
 PHC configuration
 -----------------
 

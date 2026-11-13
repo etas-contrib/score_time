@@ -20,10 +20,19 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+genrule(
+    name = "config_limits",
+    srcs = [":time_slave_config_schema"],
+    outs = ["config_limits.h"],
+    cmd = "$(location //score/time_slave/src/application/configuration/tools:gen_config_limits) $(location :time_slave_config_schema) > $@",
+    tools = ["//score/time_slave/src/application/configuration/tools:gen_config_limits"],
+)
+
 cc_library(
     name = "configuration",
     srcs = ["config_parser.cpp"],
     hdrs = [
+        "config_limits.h",
         "config_parser.h",
         "time_slave_config.h",
     ],
