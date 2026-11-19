@@ -74,6 +74,7 @@ use_repo(
     "score_gcc_aarch64_toolchain",
     "score_gcc_x86_64_toolchain",
     "score_qcc_aarch64_toolchain",
+    "score_qcc_aarch64_toolchain_pkg",
     "score_qcc_x86_64_toolchain",
     "score_qcc_x86_64_toolchain_pkg",
 )
@@ -243,6 +244,13 @@ use_repo(pip, codeql_coding_standards_pip_hub = "time_codeql_coding_standards_pi
 ## Integration Test Framework dependencies
 
 bazel_dep(name = "score_itf", version = "0.7.0")
+bazel_dep(name = "os_images", version = "1.0", dev_dependency = True)
+# TODO: Switch back to a released version once the automatic /opt mount is released.
+git_override(
+    module_name = "os_images",
+    commit = "6d493760c5aa5d4dc9d4a168cce49732bc976338",
+    remote = "https://github.com/eclipse-score/os_images.git",
+)
 
 bazel_dep(name = "bazel_skylib", version = "1.9.0", dev_dependency = True)
 
@@ -276,6 +284,23 @@ imagefs.toolchain(
     type = "ifs",
 )
 use_repo(imagefs, "score_qnx_x86_64_ifs_toolchain")
+imagefs.toolchain(
+    name = "score_qnx_aarch64_ifs_toolchain",
+    sdp_to_import = "@score_qcc_aarch64_toolchain_pkg",
+    # See score_qnx_x86_64_ifs_toolchain for why this is 8.0.0.
+    sdp_version = "8.0.0",
+    target_cpu = "aarch64",
+    target_os = "qnx",
+    type = "ifs",
+)
+use_repo(imagefs, "score_qnx_aarch64_ifs_toolchain")
+imagefs.toolchain(
+    name = "score_linux_x86_64_ext4_toolchain",
+    target_cpu = "x86_64",
+    target_os = "linux",
+    type = "ext4",
+)
+use_repo(imagefs, "score_linux_x86_64_ext4_toolchain")
 
 ## JSON Schema validation (build-time lint)
 
